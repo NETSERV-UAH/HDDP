@@ -1,0 +1,178 @@
+package DHTapp;
+
+import org.onosproject.net.*;
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.link.*;
+
+import java.time.Duration;
+import java.util.Set;
+
+import org.onosproject.net.provider.ProviderId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+import static org.onosproject.net.PortNumber.portNumber;
+import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.config.basics.BasicLinkConfig;
+import org.onosproject.net.SparseAnnotations;
+
+
+/**
+ * @brief Provider de enlaces para DHT
+ * @author Joaquin Alvarez Horcajo
+ */
+
+public class DHTproviderlink implements LinkProvider{
+
+    /*!< @brief Servicio para interactuar con el inventario de dispositivos */
+    //private DeviceService deviceService;
+    //private LinkService linkService;
+
+    /** Atributes */
+    /** @brieg Servicio de Log*/
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final long DEF_BANDWIDTH = -1L;
+    private static final double DEF_METRIC = -1;
+    private static final Duration DEF_DURATION = Duration.ofNanos(-1L);
+
+    /** Methods */
+    /**
+     * Creates a new element of DHTprovicerLink class.
+     *
+     */
+    public DHTproviderlink(){ }
+
+    /**
+     * Signals that an infrastructure link has been detected.
+     *
+     * @param linkDescription link information
+     */
+    public void linkDetected(LinkDescription linkDescription, LinkProviderService linkProviderService) {
+        linkProviderService.linkDetected(linkDescription);
+    }
+
+    /**
+     * Signals that an infrastructure link has disappeared.
+     *
+     * @param linkDescription link information
+     */
+    public void linkVanished(LinkDescription linkDescription, LinkProviderService linkProviderService) {
+        linkProviderService.linkVanished(linkDescription);
+    }
+
+    /**
+     * Signals that infrastructure links associated with the specified
+     * connect point have vanished.
+     *
+     * @param connectPoint connect point
+     */
+     public void linksVanished(ConnectPoint connectPoint, LinkProviderService linkProviderService) {
+        linkProviderService.linksVanished(connectPoint);
+    }
+
+    /**
+     * Signals that infrastructure links associated with the specified
+     * device have vanished.
+     *
+     * @param deviceId device identifier
+     */
+    public void linksVanished(DeviceId deviceId, LinkProviderService linkProviderService) {
+        linkProviderService.linksVanished(deviceId);
+    }
+
+    /** @brief Recopila los enlaces configurados **/
+    public void createLinks(NetworkConfigRegistry netCfgService, Set<LinkKey> configuredLinks) {
+        netCfgService.getSubjects(LinkKey.class).forEach(LinkKey -> configuredLinks.add(LinkKey));
+    }
+
+    /** @brief Crea un enlace entre dos dispositivos SDN **/
+    public boolean linkbewteenSDNdevices(Set<LinkKey> configuredLinks, int srcport, int dstport, String srcDpId ,
+                                         String dstDpId, DeviceService deviceService, LinkProviderService linkProviderService) {
+
+        PortNumber srcPortNumber = portNumber(srcport);
+        PortNumber dstPortNumber = portNumber(dstport);
+
+        DeviceId srcDeviceId = DeviceId.deviceId(srcDpId);
+        DeviceId dstDeviceId = DeviceId.deviceId(dstDpId);
+
+        /** Chequemos los devices */
+        if ( deviceService.getDevice(srcDeviceId).hwVersion().isEmpty() ||
+                deviceService.getDevice(dstDeviceId).hwVersion().isEmpty())
+        {
+            log.info("NO se encuentra alguno de los elementos del enlace");
+            return false;
+        }
+        log.info("Los dos nodos del enlace son correctos seguimos!!!");
+
+        ConnectPoint src = new ConnectPoint(srcDeviceId, srcPortNumber);
+        ConnectPoint dst = new ConnectPoint(dstDeviceId, dstPortNumber);
+
+        LinkKey linkKey = LinkKey.linkKey(src, dst);
+        /** Le comunicaciones que es bidireccional y no es durable */
+        BasicLinkConfig linkconfig = new BasicLinkConfig(linkKey);
+        linkconfig.isBidirectional(true);
+        linkconfig.isDurable(false);
+
+        SparseAnnotations sa = insertannotation(linkconfig);
+
+        LinkDescription ld = new DefaultLinkDescription(linkKey.src(), linkKey.dst(), Link.Type.DIRECT, sa);
+        log.info("LD create OK {}", ld);
+
+        /** Genero el linkkey entre ambos equipos */
+
+
+        if (configuredLinks.contains(linkKey)) {
+            log.info("Found configured link {}", linkKey);
+            try {
+                linkVanished(ld,linkProviderService);
+                log.debug("Remove link OK", linkKey);
+            } catch (IllegalStateException e) {
+                return false;
+            }
+        }
+        log.info("Found link that was not in the configuration {}", linkKey);
+        try{
+            linkDetected(ld,linkProviderService);
+            configuredLinks.add(linkKey);
+        }catch (Exception e){
+            log.error("ERROR: ALGO NO VA BIEN CON LA CREACION DE LOS ENLACES!!!");
+            log.error("toString(): "  + e.toString());
+            log.error("getMessage(): " + e.getMessage());
+        }
+        return true;
+    }
+
+    /**
+     * Generates an annotation from an existing annotation and LinkConfig.
+     *
+     * @param cfg the link config entity from network config
+     * @return annotation combining both sources
+     */
+
+    public static DefaultAnnotations insertannotation(BasicLinkConfig cfg) {
+        DefaultAnnotations.Builder b = DefaultAnnotations.builder();
+
+        if (cfg.metric() != DEF_METRIC) {
+            b.set(AnnotationKeys.METRIC, String.valueOf(cfg.metric()));
+        }
+        if (cfg.latency() != DEF_DURATION) {
+            b.set(AnnotationKeys.LATENCY, cfg.latency().toString());
+        }
+        if (cfg.bandwidth() != DEF_BANDWIDTH) {
+            b.set(AnnotationKeys.BANDWIDTH, String.valueOf(cfg.bandwidth()));
+        }
+        if (cfg.isDurable() != false) {
+            b.set(AnnotationKeys.DURABLE, String.valueOf(cfg.isDurable()));
+        }
+        if (cfg.isBidirectional() != false){
+            b.set("Bidirectional", String.valueOf(cfg.isBidirectional()));
+        }
+        return b.build();
+    }
+
+    @Override
+    public ProviderId id() {
+        return null;
+    }
+}

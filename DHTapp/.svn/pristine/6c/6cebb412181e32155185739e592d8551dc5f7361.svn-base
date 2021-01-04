@@ -1,0 +1,85 @@
+package DHTapp;
+
+import org.onlab.packet.*;
+import org.onosproject.net.*;
+import java.util.*;
+/** Librerias para enlaces */
+import org.onosproject.net.provider.ProviderId;
+
+/** Librerias para devices */
+import org.onosproject.net.device.DeviceDescription;
+import org.onosproject.net.device.DeviceProvider;
+import org.onosproject.net.device.DeviceProviderRegistry;
+import org.onosproject.net.device.DeviceProviderService;
+import org.onosproject.net.device.PortDescription;
+import org.onosproject.net.device.PortStatistics;
+import org.onosproject.net.device.DeviceService;
+
+
+public class deviceshandler implements DeviceProviderRegistry  {
+
+    private static final String UNKNOWN = new String("unknown");
+
+    DeviceProvider provider;
+
+    Set<DeviceId> connected = new HashSet<>();
+
+    private Map<DeviceId, Device> deviceMap = new HashMap<>();
+
+    @Override
+    public DeviceProviderService register(DeviceProvider provider) {
+        this.provider = provider;
+        return new DHTProviderService();
+    }
+
+    @Override
+    public void unregister(DeviceProvider provider) {
+    }
+
+    @Override
+    public Set<ProviderId> getProviders() {
+        return null;
+    }
+
+    private class DHTProviderService implements DeviceProviderService {
+
+        @Override
+        public DeviceProvider provider() {
+            return null;
+        }
+
+        @Override
+        public void deviceConnected(DeviceId deviceId, DeviceDescription deviceDescription) {
+            connected.add(deviceId);
+            Device device = new DefaultDevice(ProviderId.NONE, deviceId, Device.Type.ROUTER, UNKNOWN, UNKNOWN,
+                    UNKNOWN, UNKNOWN, new ChassisId(), deviceDescription.annotations());
+            deviceMap.put(deviceId, device);
+        }
+
+        @Override
+        public void deviceDisconnected(DeviceId deviceId) {
+            connected.remove(deviceId);
+            deviceMap.remove(deviceId);
+        }
+
+        @Override
+        public void updatePorts(DeviceId deviceId, List<PortDescription> portDescriptions) {
+            // TODO Auto-generated method stub
+        }
+
+        @Override
+        public void portStatusChanged(DeviceId deviceId, PortDescription portDescription) {
+            // TODO Auto-generated method stub
+        }
+
+        @Override
+        public void receivedRoleReply(DeviceId deviceId, MastershipRole requested, MastershipRole response) {
+            // TODO Auto-generated method stub
+        }
+
+        @Override
+        public void updatePortStatistics(DeviceId deviceId, Collection<PortStatistics> portStatistics) {
+            /** Se crea por necesidad de la clase padre, no vamos a generar valores estadisticos */
+        }
+    }
+}

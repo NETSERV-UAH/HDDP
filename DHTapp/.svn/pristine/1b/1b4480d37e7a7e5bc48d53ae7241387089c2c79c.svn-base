@@ -1,0 +1,113 @@
+package DHTapp;
+
+import org.onlab.packet.MacAddress;
+import org.onlab.packet.VlanId;
+import org.onosproject.net.*;
+import org.onosproject.net.host.DefaultHostDescription;
+import org.onosproject.net.host.HostProvider;
+import org.onosproject.net.host.HostProviderService;
+import org.onosproject.net.host.HostService;
+import org.onosproject.net.provider.ProviderId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+
+import static org.onosproject.net.DeviceId.deviceId;
+import static org.onosproject.net.PortNumber.portNumber;
+
+/**
+ * @brief Provider de host para DHT
+ * @author Joaquin Alvarez Horcajo
+ */
+
+public class DHTproviderhost implements HostProvider {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    public short TYPE_SENSOR = 3;
+    public static ProviderId PID;
+
+    public DHTproviderhost(ProviderId pid){
+        PID = pid;
+    }
+
+    public void Createhost(HostProviderService hps, MacAddress Mac, DeviceId iddevice, PortNumber portNode){
+
+        HostId hostId = HostId.hostId(Mac);
+        HostLocation location = new HostLocation(new ConnectPoint(iddevice, portNode), 0);
+        DefaultHostDescription desc =
+                new DefaultHostDescription(Mac, VlanId.vlanId((short)(-1)), location, null);
+        hps.hostDetected(hostId, desc, true);
+    }
+
+    public boolean hostexist(HostService hsrv, MacAddress Mac)
+    {
+        if (!hsrv.getHost(HostId.hostId(Mac)).configured()){
+            return true;
+        }
+        return false;
+    }
+
+    public MacAddress long2mac(String Mac){
+        if (Mac.length()<12){
+            /* Necesitamos meter 0 por delante */
+            for (int pos = Mac.length(); pos < Mac.length(); pos++)
+                Mac = "0"+Mac;
+        }
+        /* Normalizamos a MAC*/
+        Mac = Mac.charAt(0)+Mac.charAt(1)+":"+Mac.charAt(2)+Mac.charAt(0)+":"+
+                Mac.charAt(3)+Mac.charAt(4)+":"+Mac.charAt(5)+Mac.charAt(6)+":"+
+                Mac.charAt(7)+Mac.charAt(8)+":"+Mac.charAt(9)+Mac.charAt(10)+":"+
+                Mac.charAt(11)+Mac.charAt(12);
+        return MacAddress.valueOf(Mac);
+    }
+
+    public void Movehost(HostService hsv, HostProviderService hps, MacAddress Mac, DeviceId iddevice, PortNumber portNode){
+        //MacAddress mac = MacAddress.valueOf(Mac);
+        HostId hostId = HostId.hostId(Mac);
+        /** Eliminamos el host */
+        if(hostexist(hsv, Mac))
+            hps.hostVanished(hostId);
+        /** Lo volvemos a crear en el nuevo punto*/
+        Createhost(hps, Mac,iddevice, portNode);
+    }
+
+    public boolean checkhost(HostService hsv, HostProviderService hps, DHTpacket Packet_dht){
+        short type_device[] = Packet_dht.getTypedevices();
+        long idmacs[] = Packet_dht.getidmacdevices();
+        int port_in_gateway[] = Packet_dht.getinports(); /** En el caso de los host es el mismo */
+
+        for (int pos = 0; pos < Packet_dht.getNumDevices(); pos++){
+            if (type_device[pos] == TYPE_SENSOR ){
+                /** Debemos actualizar los dispositivos siempre */
+                try{
+                    if(!hostexist(hsv, long2mac(Long.toHexString(idmacs[pos])))){
+                        Createhost(hps, long2mac(Long.toHexString(idmacs[pos])),
+                                deviceId(URI.create("sw:"+Long.toHexString(idmacs[pos+1]))),
+                                PortNumber.portNumber(port_in_gateway[pos+1]));
+                    }
+                    else{
+                        Movehost(hsv, hps, long2mac(Long.toHexString(idmacs[pos])),
+                                deviceId(URI.create("sw:"+Long.toHexString(idmacs[pos + 1]))),
+                                portNumber(port_in_gateway[pos+1]));
+                    }
+
+                }catch (Exception e){
+                    log.error("DHTapp ERROR al crear nuevos host : "+ e.getMessage());
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void triggerProbe(Host host) {
+
+    }
+
+    @Override
+    public ProviderId id() {
+        return PID;
+    }
+}

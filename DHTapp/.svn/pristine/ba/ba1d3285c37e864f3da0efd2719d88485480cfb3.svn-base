@@ -1,0 +1,72 @@
+package DHTapp;
+
+
+/**
+ * @brief Provider de host para DHT
+ * @author Joaquin Alvarez Horcajo
+ */
+
+
+import org.onlab.packet.IpAddress;
+import org.onlab.packet.MacAddress;
+import org.onlab.packet.VlanId;
+import org.onosproject.net.*;
+import org.onosproject.net.host.DefaultHostDescription;
+import org.onosproject.net.host.HostProvider;
+import org.onosproject.net.host.HostProviderService;
+import org.onosproject.net.host.HostService;
+import org.onosproject.net.provider.ProviderId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class DHTproviderhost implements HostProvider {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    public DHTproviderhost(){}
+
+    public void Createhost(HostProviderService hps, String Mac,DeviceId iddevice, PortNumber portNode){
+
+        HostId hostId = HostId.hostId(MacAddress.valueOf(Mac), VlanId.vlanId((short)(-1)));
+        HostLocation location = new HostLocation(new ConnectPoint(iddevice, portNode), 0);
+        DefaultHostDescription desc =
+                new DefaultHostDescription(MacAddress.valueOf(Mac), VlanId.vlanId((short)(-1)), location, null);
+        hps.hostDetected(hostId, desc, true);
+    }
+
+    public boolean hostexist(HostService hsrv, String Mac)
+    {
+        for (Host host: hsrv.getHosts()){
+            if (host.mac().equals( MacAddress.valueOf(Mac)))
+                return true;
+        }
+        return false;
+    }
+
+    public void Movehost(HostProviderService hps, String Mac, DeviceId iddevice, PortNumber portNode){
+        MacAddress mac = MacAddress.valueOf(Mac);
+        HostId hostId = HostId.hostId(MacAddress.valueOf(Mac), VlanId.vlanId((short)(-1)));
+        /** Eliminamos el host */
+        hps.hostVanished(hostId);
+        /** Lo volvemos a crear en el nuevo punto*/
+        Createhost(hps, Mac,iddevice, portNode);
+    }
+
+    public boolean checkhost(HostProviderService hps, HostService hsv, DHTpacket Packet_in_dht){
+
+        return true;
+    }
+
+    @Override
+    public void triggerProbe(Host host) {
+
+    }
+
+    @Override
+    public ProviderId id() {
+        return null;
+    }
+}
