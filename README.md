@@ -94,5 +94,4 @@ Please submit your bug reports, fixes and suggestions as pull requests on
 GitHub, or by contacting us directly.
 
 # License
-HDDP Switch is released under the BSD license (BSD-like for
-code from the original Stanford switch).
+HDDP Switch is released under the GPLv3 license.
